@@ -1,5 +1,3 @@
-from altair import value
-from cycler import V
 import pandas as pd
 import plotly.express as px
 

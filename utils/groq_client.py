@@ -2,10 +2,8 @@ import os
 import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
-from numpy import dtype
-from pandas import DataFrame
 import pandas as pd
-from pyparsing import line
+
 
 load_dotenv()
 api_key=os.getenv("GROQ_API_KEY")  or st.secrets.get("GROQ_API_KEY")
