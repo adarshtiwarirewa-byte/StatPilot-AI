@@ -1,4 +1,5 @@
 import os
+import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
 from numpy import dtype
@@ -7,8 +8,9 @@ import pandas as pd
 from pyparsing import line
 
 load_dotenv()
+api_key=os.getenv("GROQ_API_KEY")  or st.secrets.get("GROQ_API_KEY")
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(api_key=api_key)
 
 
 def build_schema_description(df:pd.DataFrame) -> str:
