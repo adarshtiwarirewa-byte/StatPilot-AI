@@ -18,6 +18,12 @@ from modules.eda import (
     get_frequency_table,
 )
 
+from modules.rag_QA import answer_question
+from utils.pdf_parser import extract_text_from_pdf
+from utils.embedding_engine import chunk_text, embed_chunks
+from utils.vector_store import VectorStore
+
+
 
 
 
@@ -118,7 +124,7 @@ st.markdown("""
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
     with st.sidebar:
-     st.image("assets/logo_transparent_v2.png", width=60,use_container_width=True)
+     st.image("assets/logo_transparent_v2.png", width='stretch')
      st.markdown(
           "<p style='text-align: center; color: #94A3B8; font-size: 16px; margin-top: -10px;'>"
           "AI-Powered Statistical Analysis Assistant</p>",
@@ -153,10 +159,11 @@ else:
     if df is not None:
         st.success("Dataset loaded successfully!")
 
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📁 Overview",
+            "Know Documentaion of Dataset(RAG)",
             "📈 EDA",
-            "🤖 AI Chat",
+            "🤖 AI Chat(SQL)",
             "🧠 Machine Learning",
         ])
 
@@ -182,8 +189,80 @@ else:
             })
             st.dataframe(col_info_df, use_container_width=True)
 
-        # ---------------- TAB 2: EDA ----------------
+
+        # Ask Documentation of the DATASET
         with tab2:
+            st.subheader("Ask Your Dataset's Documentation")
+            st.caption("Upload a PDF (data dictionary, README, or documentation) and ask questions about it.")
+            
+            uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"], key="rag_pdf_uploader")
+
+            MAX_FILE_SIZE_MB = 10
+            MAX_QUESTIONS_PER_SESSION = 15
+            
+            if uploaded_pdf is not None:
+
+                file_size_mb = uploaded_pdf.size / (1024 * 1024)
+    
+                if file_size_mb > MAX_FILE_SIZE_MB:
+                    st.error(f"File too large ({file_size_mb:.1f}MB). Please upload a PDF under {MAX_FILE_SIZE_MB}MB.")
+                    st.stop()
+
+
+                # Process only once per uploaded file (avoid re-processing on every rerun)
+
+
+                if "rag_vector_store" not in st.session_state or st.session_state.get("rag_pdf_name") != uploaded_pdf.name:
+                    with st.spinner("Processing document... (extracting text, creating embeddings)"):
+                        pages = extract_text_from_pdf(uploaded_pdf)
+                        chunks = chunk_text(pages)
+                        chunks_with_embeddings = embed_chunks(chunks)
+                        
+                        store = VectorStore(embedding_dim=384)
+                        store.add_chunks(chunks_with_embeddings)
+                        
+                        st.session_state["rag_vector_store"] = store
+                        st.session_state["rag_pdf_name"] = uploaded_pdf.name
+                        st.session_state["rag_chat_history"] = []
+                        st.session_state['rag_question_count'] = 0
+                    st.success(f"Document processed! ({len(chunks)} chunks created)")
+                
+                st.divider()
+                
+                # Display chat history
+                for msg in st.session_state.get("rag_chat_history", []):
+                    with st.chat_message(msg["role"]):
+                        st.write(msg["content"])
+                        if msg["role"] == "assistant" and msg.get("sources"):
+                            st.caption(f"Source: Page(s) {', '.join(map(str, msg['sources']))}")
+
+                st.caption(f"Questions used: {st.session_state.get('rag_question_count', 0)}/{MAX_QUESTIONS_PER_SESSION}")
+
+                # Chat input with session limit
+                if st.session_state.get("rag_question_count", 0) >= MAX_QUESTIONS_PER_SESSION:
+                    st.warning(f"You've reached the limit of {MAX_QUESTIONS_PER_SESSION} questions for this session. Please refresh the page to continue.")
+                else:
+                    user_question = st.chat_input("Ask a question about the document...")
+
+                    if user_question:
+                        st.session_state["rag_chat_history"].append({"role": "user", "content": user_question})
+                        st.session_state["rag_question_count"] += 1
+
+                        with st.spinner("Thinking..."):
+                            result = answer_question(user_question, st.session_state["rag_vector_store"],top_k=8)
+
+                        st.session_state["rag_chat_history"].append({
+                            "role": "assistant",
+                            "content": result["answer"],
+                            "sources": result["sources"]
+                        })
+                        st.rerun()
+            else:
+                st.info("Upload a PDF to get started.")
+
+
+        # ---------------- TAB 2: EDA ----------------
+        with tab3:
             st.caption("Visualize distributions and relationships hidden in your data.")
 
             numeric_cols = get_numeric_columns(df)
@@ -254,7 +333,7 @@ else:
                     st.dataframe(freq_df, use_container_width=True)
 
         # ---------------- TAB 3: AI CHAT ----------------
-        with tab3:
+        with tab4:
             conn = create_sql_table(df, table_name="dataset")
             st.caption("Ask questions about your data in plain English — AI converts it into SQL automatically.")
 
@@ -275,7 +354,7 @@ else:
                     st.dataframe(result_df, use_container_width=True)
 
         # ---------------- TAB 4: MACHINE LEARNING ----------------
-        with tab4:
+        with tab5:
             st.caption("Select a target column and compare baseline model performance instantly.")
             target_column = st.selectbox(
                 "Select the target column (what you want to predict)",
