@@ -4,7 +4,7 @@ def extract_text_from_pdf(pdf_file):
     """
     Extracts text from a pdf file, page by page.
 
-    Args : pdf_file path or pdf file like objext.
+    Args : pdf_file path or pdf file like object.
 
     Returns : list of dict : [{'page':1,"text" : text},{'page' : 2,"text":text},...,{..}]
     

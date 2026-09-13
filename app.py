@@ -22,7 +22,7 @@ from modules.rag_QA import answer_question
 from utils.pdf_parser import extract_text_from_pdf
 from utils.embedding_engine import chunk_text, embed_chunks
 from utils.vector_store import VectorStore
-
+from modules.data_cleaning  import  provide_data_cleaning_tab, provide_missing_values_section, provide_outliers_section,provide_duplicate_section
 
 
 
@@ -154,18 +154,30 @@ if uploaded_file is None:
     )
     st.info("👈 Upload a CSV or Excel file from the sidebar to get started.")
 else:
-    df = load_dataset(uploaded_file)
+    df_uploaded = load_dataset(uploaded_file)
 
-    if df is not None:
+    # Storing original and copying df ,  We will work on df like cleaning and all but not in original_df. 
+    # Due to this we can return to our original dataframe whenever we wanted.
+
+    if df_uploaded is not None:
+        if "current_file_id" not in st.session_state or st.session_state.current_file_id != uploaded_file.file_id:
+            st.session_state.df_original = df_uploaded.copy()
+            st.session_state.df = df_uploaded.copy()
+            st.session_state.current_file_id = uploaded_file.file_id
+
+        if "pending_sql" not in st.session_state:
+            st.session_state.pending_sql = None
+
         st.success("Dataset loaded successfully!")
-
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📁 Overview",
-            "Know Documentaion of Dataset(RAG)",
-            "📈 EDA",
-            "🤖 AI Chat(SQL)",
-            "🧠 Machine Learning",
-        ])
+        df = st.session_state.df
+        tab1, tab2, tab3, tab4, tab5 ,tab6= st.tabs([
+                                                    "📁 Overview",
+                                                    "Know Documentaion of Dataset(RAG)",
+                                                    "📈 EDA",
+                                                    "🤖 AI Chat(SQL)",
+                                                    "Data Cleaning",
+                                                    "🧠 Machine Learning",
+                                                ])
 
         # ---------------- TAB 1: OVERVIEW ----------------
         with tab1:
@@ -190,7 +202,7 @@ else:
             st.dataframe(col_info_df, use_container_width=True)
 
 
-        # Ask Documentation of the DATASET
+        # --------------------TAB 2 : Ask Documentation of the DATASET---------------
         with tab2:
             st.subheader("Ask Your Dataset's Documentation")
             st.caption("Upload a PDF (data dictionary, README, or documentation) and ask questions about it.")
@@ -260,8 +272,7 @@ else:
             else:
                 st.info("Upload a PDF to get started.")
 
-
-        # ---------------- TAB 2: EDA ----------------
+        # ---------------- TAB 3: EDA ----------------
         with tab3:
             st.caption("Visualize distributions and relationships hidden in your data.")
 
@@ -332,7 +343,7 @@ else:
                     freq_df = get_frequency_table(df, selected_cat_col)
                     st.dataframe(freq_df, use_container_width=True)
 
-        # ---------------- TAB 3: AI CHAT ----------------
+        # ---------------- TAB 4: AI CHAT ----------------
         with tab4:
             conn = create_sql_table(df, table_name="dataset")
             st.caption("Ask questions about your data in plain English — AI converts it into SQL automatically.")
@@ -353,8 +364,18 @@ else:
                     result_df = run_sql_query(conn, sql_query)
                     st.dataframe(result_df, use_container_width=True)
 
-        # ---------------- TAB 4: MACHINE LEARNING ----------------
+
+        # ----------------TAB 5 : DATA CLEANING -------------------
         with tab5:
+            if st.button("🔄 Reset to Original Dataset"):
+                st.session_state.df = st.session_state.df_original.copy()
+                st.rerun()
+            provide_data_cleaning_tab(df)
+
+
+
+        # ---------------- TAB 5: MACHINE LEARNING ----------------
+        with tab6:
             st.caption("Select a target column and compare baseline model performance instantly.")
             target_column = st.selectbox(
                 "Select the target column (what you want to predict)",
