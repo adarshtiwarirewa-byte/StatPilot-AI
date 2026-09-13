@@ -23,7 +23,7 @@ from utils.pdf_parser import extract_text_from_pdf
 from utils.embedding_engine import chunk_text, embed_chunks
 from utils.vector_store import VectorStore
 from modules.data_cleaning  import  provide_data_cleaning_tab, provide_missing_values_section, provide_outliers_section,provide_duplicate_section
-
+from modules.statistical_analysis import render_statistical_analysis_tab
 
 
 
@@ -170,13 +170,14 @@ else:
 
         st.success("Dataset loaded successfully!")
         df = st.session_state.df
-        tab1, tab2, tab3, tab4, tab5 ,tab6= st.tabs([
+        tab1, tab2, tab3, tab4, tab5 ,tab6,tab7= st.tabs([
                                                     "📁 Overview",
                                                     "Know Documentaion of Dataset(RAG)",
                                                     "📈 EDA",
                                                     "🤖 AI Chat(SQL)",
                                                     "Data Cleaning",
                                                     "🧠 Machine Learning",
+                                                    "📊 Statistical Analysis"
                                                 ])
 
         # ---------------- TAB 1: OVERVIEW ----------------
@@ -190,7 +191,7 @@ else:
             col3.metric("Duplicate Rows", info["duplicate_rows"])
 
             st.subheader("Preview")
-            st.dataframe(df.head(10), use_container_width=True)
+            st.dataframe(df.sample(10), use_container_width=True)
 
             st.subheader("Column Info")
             col_info_df = pd.DataFrame({
@@ -437,3 +438,10 @@ else:
                               results_df = train_and_evaluate(X, y, problem_type)
                               st.subheader("Model Results")
                               st.dataframe(results_df, use_container_width=True)
+
+
+
+        #----------------------Tab7 : Statistical Analysis------------------
+
+        with tab7 :
+            render_statistical_analysis_tab()
